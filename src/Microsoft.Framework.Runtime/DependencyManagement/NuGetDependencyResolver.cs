@@ -283,7 +283,7 @@ namespace Microsoft.Framework.Runtime
                                           IEnumerable<IPackagePathResolver> cacheResolvers,
                                           PackageInfo packageInfo)
         {
-            string expectedHash = packageInfo.LockFileLibrary.Sha;
+            string expectedHash = packageInfo.LockFileLibrary.Sha512;
 
             foreach (var resolver in cacheResolvers)
             {

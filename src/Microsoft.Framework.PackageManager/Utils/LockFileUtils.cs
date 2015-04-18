@@ -101,7 +101,8 @@ namespace Microsoft.Framework.PackageManager.Utils
                 foreach (var runtimeSpec in context.RuntimeSpecs)
                 {
                     criteriaBuilderWithTfm = criteriaBuilderWithTfm
-                    .Add["tfm", framework]["rid", runtimeSpec.Name];
+                    .Add["tfm", framework]["rid", runtimeSpec.Name]
+                    .Add["tfm", new FrameworkName("Core", new Version(5, 0))]["rid", runtimeSpec.Name];
 
                     criteriaBuilderWithoutTfm = criteriaBuilderWithoutTfm
                         .Add["rid", runtimeSpec.Name];
@@ -109,7 +110,8 @@ namespace Microsoft.Framework.PackageManager.Utils
             }
 
             criteriaBuilderWithTfm = criteriaBuilderWithTfm
-                .Add["tfm", framework];
+                .Add["tfm", framework]
+                .Add["tfm", new FrameworkName("Core", new Version(5, 0))];
 
             var criteria = criteriaBuilderWithTfm.Criteria;
 

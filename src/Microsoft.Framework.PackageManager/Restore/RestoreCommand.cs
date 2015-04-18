@@ -370,52 +370,57 @@ namespace Microsoft.Framework.PackageManager
             var installItems = new List<GraphItem>();
             var missingItems = new HashSet<LibraryRange>();
 
-            ForEach(targetContexts.Select(t => t.Root), node =>
+            foreach (var context in targetContexts)
             {
-                if (node == null ||
+                ForEach(context.Root, node =>
+                {
+                    if (node == null ||
                     node.LibraryRange == null ||
                     node.Disposition == GraphNode.DispositionType.Rejected)
-                {
-                    return;
-                }
-
-                if (node.Item == null || node.Item.Match == null)
-                {
-                    if (!node.LibraryRange.IsGacOrFrameworkReference &&
-                         node.LibraryRange.VersionRange != null &&
-                         missingItems.Add(node.LibraryRange))
                     {
-                        var errorMessage = string.Format("Unable to locate {0} {1}",
-                            node.LibraryRange.Name.Red().Bold(),
-                            node.LibraryRange.VersionRange);
-                        ErrorMessages.GetOrAdd(projectJsonPath, _ => new List<string>()).Add(errorMessage);
-                        Reports.Error.WriteLine(errorMessage);
-                        success = false;
+                        return;
                     }
 
-                    return;
-                }
+                    if (node.Item == null || node.Item.Match == null)
+                    {
+                        if (!node.LibraryRange.IsGacOrFrameworkReference &&
+                             node.LibraryRange.VersionRange != null &&
+                             missingItems.Add(node.LibraryRange))
+                        {
+                            var errorMessage = string.Format("Unable to locate {0} {1}",
+                                node.LibraryRange.Name.Red().Bold(),
+                                node.LibraryRange.VersionRange);
+                            ErrorMessages.GetOrAdd(projectJsonPath, _ => new List<string>()).Add(errorMessage);
+                            Reports.Error.WriteLine(errorMessage);
+                            success = false;
+                        }
 
-                if (!string.Equals(node.Item.Match.Library.Name, node.LibraryRange.Name, StringComparison.Ordinal))
-                {
-                    // Fix casing of the library name to be installed
-                    node.Item.Match.Library.Name = node.LibraryRange.Name;
-                }
+                        return;
+                    }
 
-                var isRemote = remoteProviders.Contains(node.Item.Match.Provider);
-                var isInstallItem = installItems.Any(item => item.Match.Library == node.Item.Match.Library);
+                    if (!string.Equals(node.Item.Match.Library.Name, node.LibraryRange.Name, StringComparison.Ordinal))
+                    {
+                        // Fix casing of the library name to be installed
+                        node.Item.Match.Library.Name = node.LibraryRange.Name;
+                    }
 
-                if (!isInstallItem && isRemote)
-                {
-                    installItems.Add(node.Item);
-                }
+                    var isRemote = remoteProviders.Contains(node.Item.Match.Provider);
+                    var isInstallItem = installItems.Any(item => item.Match.Library == node.Item.Match.Library);
 
-                var isGraphItem = graphItems.Any(item => item.Match.Library == node.Item.Match.Library);
-                if (!isGraphItem)
-                {
-                    graphItems.Add(node.Item);
-                }
-            });
+                    if (!isInstallItem && isRemote)
+                    {
+                        installItems.Add(node.Item);
+                    }
+
+                    var isGraphItem = graphItems.Any(item => item.Match.Library == node.Item.Match.Library);
+                    if (!isGraphItem)
+                    {
+                        graphItems.Add(node.Item);
+                    }
+
+                    context.Items.Add(node.Item);
+                });
+            }
 
             await InstallPackages(installItems, packagesDirectory);
 
@@ -733,34 +738,16 @@ namespace Microsoft.Framework.PackageManager
                 target.TargetFramework = context.RestoreContext.FrameworkName;
                 target.RuntimeIdentifier = context.RestoreContext.RuntimeName;
 
-                var usedLibraries = new HashSet<string>();
-
-                ForEach(context.Root, node =>
+                foreach (var item in context.Items.OrderBy(x => x.Match.Library, new LibraryComparer()))
                 {
-                    if (node == null ||
-                        node.LibraryRange == null ||
-                        node.Disposition == GraphNode.DispositionType.Rejected)
-                    {
-                        return;
-                    }
+                    var library = item.Match.Library;
 
-                    if (node.Item == null || node.Item.Match == null)
-                    {
-                        return;
-                    }
-
-                    if (!usedLibraries.Add(node.Item.Match.Library.Name))
-                    {
-                        return;
-                    }
-
-                    var library = node.Item.Match.Library;
                     var packageInfo = repository.FindPackagesById(library.Name)
                         .FirstOrDefault(p => p.Version == library.Version);
 
                     if (packageInfo == null)
                     {
-                        return;
+                        continue;
                     }
 
                     var package = packageInfo.Package;
@@ -772,7 +759,7 @@ namespace Microsoft.Framework.PackageManager
                         correctedPackageName: library.Name);
 
                     target.Libraries.Add(targetLibrary);
-                });
+                }
 
                 lockFile.Targets.Add(target);
             }
@@ -919,6 +906,8 @@ namespace Microsoft.Framework.PackageManager
         private class TargetContext
         {
             public RestoreContext RestoreContext { get; set; }
+
+            public HashSet<GraphItem> Items { get; set; } = new HashSet<GraphItem>();
 
             public GraphNode Root { get; set; }
         }

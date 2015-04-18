@@ -423,23 +423,11 @@ namespace Microsoft.Framework.PackageManager
             {
                 Reports.Information.WriteLine(string.Format("Writing lock file {0}", projectLockFilePath.White().Bold()));
 
-                // Collect target frameworks
-                var frameworks = new HashSet<FrameworkName>();
-                //foreach (var item in graphItems)
-                //{
-                //    Runtime.Project dependencyProject;
-                //    if (projectProviders.Contains(item.Match.Provider) && projectResolver.TryResolveProject(item.Match.Library.Name, out dependencyProject))
-                //    {
-                //        frameworks.AddRange(dependencyProject.GetTargetFrameworks().Select(t => t.FrameworkName));
-                //    }
-                //}
-
                 var repository = new PackageRepository(packagesDirectory);
                 WriteLockFile(projectLockFilePath,
                               project,
                               graphItems,
                               repository,
-                              frameworks,
                               targetContexts);
             }
 
@@ -698,7 +686,6 @@ namespace Microsoft.Framework.PackageManager
                                    Runtime.Project project,
                                    List<GraphItem> graphItems,
                                    PackageRepository repository,
-                                   IEnumerable<FrameworkName> frameworks,
                                    IEnumerable<TargetContext> contexts)
         {
             var lockFile = new LockFile();

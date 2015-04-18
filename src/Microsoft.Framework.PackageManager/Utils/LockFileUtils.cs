@@ -132,18 +132,16 @@ namespace Microsoft.Framework.PackageManager.Utils
                 lockFileLib.NativeLibraries = nativeGroup.Items.Select(p => p.Path).ToList();
             }
 
-            // string contractPath = Path.Combine("lib", "contract", package.Id + ".dll");
-            //var hasContract = files.Any(path => path == contractPath);
-            //var hasLib = lockFileLib.RuntimeAssemblies.Any();
+            // COMPAT: Support lib/contract so older packages can be consumed
+            string contractPath = "lib/contract/" + package.Id + ".dll";
+            var hasContract = files.Any(path => path == contractPath);
+            var hasLib = lockFileLib.RuntimeAssemblies.Any();
 
-            //if (hasContract && hasLib && !VersionUtility.IsDesktop(framework))
-            //{
-            //    lockFileLib.CompileTimeAssemblies.Add(contractPath);
-            //}
-            //else if (hasLib)
-            //{
-            //    lockFileLib.CompileTimeAssemblies.AddRange(lockFileLib.RuntimeAssemblies);
-            //}
+            if (hasContract && hasLib && !VersionUtility.IsDesktop(framework))
+            {
+                lockFileLib.CompileTimeAssemblies.Clear();
+                lockFileLib.CompileTimeAssemblies.Add(contractPath);
+            }
 
             // TODO: figure out servicable
             //var installPath = resolver.GetInstallPath(package.Id, package.Version);

@@ -10,20 +10,7 @@ namespace NuGet.ContentModel
 
         public void Load(IEnumerable<string> paths)
         {
-            _assets = paths.Select(path => new Asset { Path = path }).SelectMany(ContractBecomesRef).ToList();
-        }
-
-        private IEnumerable<Asset> ContractBecomesRef(Asset asset)
-        {
-            yield return asset;
-            if (asset.Path.StartsWith("lib/contract"))
-            {
-                yield return new Asset
-                {
-                    Path = "ref/core50" + asset.Path.Substring("lib/contract".Length),
-                    Link = asset.Link ?? asset.Path
-                };
-            }
+            _assets = paths.Select(path => new Asset { Path = path }).ToList();
         }
 
         public IEnumerable<ContentItem> FindItems(ContentPatternDefinition definition)

@@ -142,7 +142,7 @@ namespace Microsoft.Framework.Runtime.DependencyManagement
         {
             var target = new LockFileTarget();
             var parts = property.Split(new[] { '/' }, 2);
-            target.TargetFramework = VersionUtility.ParseFrameworkName(parts[0]);
+            target.TargetFramework = new FrameworkName(parts[0]);
             if (parts.Length == 2)
             {
                 target.RuntimeIdentifier = parts[1];

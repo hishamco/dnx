@@ -418,7 +418,7 @@ namespace Microsoft.Framework.PackageManager
                         graphItems.Add(node.Item);
                     }
 
-                    context.Items.Add(node.Item);
+                    context.Libraries.Add(node.Item.Match.Library);
                 });
             }
 
@@ -738,10 +738,8 @@ namespace Microsoft.Framework.PackageManager
                 target.TargetFramework = context.RestoreContext.FrameworkName;
                 target.RuntimeIdentifier = context.RestoreContext.RuntimeName;
 
-                foreach (var item in context.Items.OrderBy(x => x.Match.Library, new LibraryComparer()))
+                foreach (var library in context.Libraries.OrderBy(x => x, new LibraryComparer()))
                 {
-                    var library = item.Match.Library;
-
                     var packageInfo = repository.FindPackagesById(library.Name)
                         .FirstOrDefault(p => p.Version == library.Version);
 
@@ -907,7 +905,7 @@ namespace Microsoft.Framework.PackageManager
         {
             public RestoreContext RestoreContext { get; set; }
 
-            public HashSet<GraphItem> Items { get; set; } = new HashSet<GraphItem>();
+            public HashSet<Library> Libraries { get; set; } = new HashSet<Library>();
 
             public GraphNode Root { get; set; }
         }

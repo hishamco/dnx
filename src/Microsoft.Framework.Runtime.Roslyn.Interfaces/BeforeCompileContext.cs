@@ -13,21 +13,27 @@ namespace Microsoft.Framework.Runtime.Roslyn
     {
         private readonly Lazy<IList<ResourceDescription>> _resources;
 
-        public BeforeCompileContext(Func<IList<ResourceDescription>> resourcesResolver)
+        public BeforeCompileContext(CSharpCompilation compilation,
+                                    IProjectContext projectContext,
+                                    Lazy<IList<ResourceDescription>> resourcesResolver,
+                                    IEnumerable<IMetadataReference> incomingReferences)
         {
-            _resources = new Lazy<IList<ResourceDescription>>(resourcesResolver);
+            Compilation = compilation;
+            ProjectContext = projectContext;
+            MetadataReferences = new List<IMetadataReference>(incomingReferences);
+            Diagnostics = new List<Diagnostic>();
+
+            _resources = resourcesResolver;
         }
 
         public CSharpCompilation Compilation { get; set; }
 
-        public IProjectContext ProjectContext { get; set; }
+        public IProjectContext ProjectContext { get; }
 
         public IList<ResourceDescription> Resources { get { return _resources.Value; } }
 
-        public IList<Diagnostic> Diagnostics { get; set; }
+        public IList<Diagnostic> Diagnostics { get; }
 
-        public IList<ICompileModule> Modules { get; set; }
-
-        public IList<IMetadataReference> MetadataReferences { get; set; }
+        public IList<IMetadataReference> MetadataReferences { get; }
     }
 }

@@ -10,9 +10,18 @@ namespace Microsoft.Framework.Runtime.Roslyn
 {
     public class AfterCompileContext
     {
-        public IProjectContext ProjectContext { get; set; }
+        public AfterCompileContext(IProjectContext projectContext, 
+                                   CSharpCompilation compilation, 
+                                   IEnumerable<Diagnostic> initialDiagnostics) 
+        {
+            ProjectContext = projectContext;
+            Compilation = compilation;
+            Diagnostics = new List<Diagnostic>(initialDiagnostics);
+        }
 
-        public CSharpCompilation Compilation { get; set; }
+        public IProjectContext ProjectContext { get; }
+
+        public CSharpCompilation Compilation { get; }
 
         public Stream AssemblyStream { get; set; }
 
@@ -20,6 +29,6 @@ namespace Microsoft.Framework.Runtime.Roslyn
 
         public Stream XmlDocStream { get; set; }
 
-        public IList<Diagnostic> Diagnostics { get; set; }
+        public IList<Diagnostic> Diagnostics { get; }
     }
 }

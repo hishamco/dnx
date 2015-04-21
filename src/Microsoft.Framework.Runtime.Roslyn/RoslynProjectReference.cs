@@ -17,18 +17,16 @@ namespace Microsoft.Framework.Runtime.Roslyn
     public class RoslynProjectReference : IRoslynMetadataReference, IMetadataProjectReference
     {
         private static Lazy<bool> _supportsPdbGeneration = new Lazy<bool>(SupportsPdbGeneration);
-        private readonly ICompilationProject _project;
 
-        public RoslynProjectReference(ICompilationProject project, BeforeCompileContext beforeCompileContext)
+        public RoslynProjectReference(CompilationContext compilationContext)
         {
-            _project = project;
-
-            BeforeCompileContext = beforeCompileContext;
-            MetadataReference = beforeCompileContext.Compilation.ToMetadataReference(embedInteropTypes: _project.EmbedInteropTypes);
-            Name = _project.Name;
+            CompilationContext = compilationContext;
+            MetadataReference = compilationContext.Compilation.ToMetadataReference(
+                embedInteropTypes: compilationContext.Project.EmbedInteropTypes);
+            Name = compilationContext.Project.Name;
         }
 
-        public BeforeCompileContext BeforeCompileContext { get; private set; }
+        public CompilationContext CompilationContext { get; private set; }
 
         public MetadataReference MetadataReference { get; private set; }
 
@@ -36,13 +34,13 @@ namespace Microsoft.Framework.Runtime.Roslyn
 
         public string ProjectPath
         {
-            get { return _project.ProjectFilePath; }
+            get { return CompilationContext.Project.ProjectFilePath; }
         }
 
         public IDiagnosticResult GetDiagnostics()
         {
-            var diagnostics = BeforeCompileContext.Diagnostics
-                .Concat(BeforeCompileContext.Compilation.GetDiagnostics());
+            var diagnostics = CompilationContext.Diagnostics
+                .Concat(CompilationContext.Compilation.GetDiagnostics());
 
             return CreateDiagnosticResult(success: true, diagnostics: diagnostics);
         }
@@ -50,12 +48,12 @@ namespace Microsoft.Framework.Runtime.Roslyn
         public IList<ISourceReference> GetSources()
         {
             // REVIEW: Raw sources?
-            return BeforeCompileContext.Compilation
-                                       .SyntaxTrees
-                                       .Select(t => t.FilePath)
-                                       .Where(path => !string.IsNullOrEmpty(path))
-                                       .Select(path => (ISourceReference)new SourceFileReference(path))
-                                       .ToList();
+            return CompilationContext.Compilation
+                                     .SyntaxTrees
+                                     .Select(t => t.FilePath)
+                                     .Where(path => !string.IsNullOrEmpty(path))
+                                     .Select(path => (ISourceReference)new SourceFileReference(path))
+                                     .ToList();
         }
 
         public Assembly Load(IAssemblyLoadContext loadContext)
@@ -63,7 +61,7 @@ namespace Microsoft.Framework.Runtime.Roslyn
             using (var pdbStream = new MemoryStream())
             using (var assemblyStream = new MemoryStream())
             {
-                IList<ResourceDescription> resources = BeforeCompileContext.Resources;
+                IList<ResourceDescription> resources = CompilationContext.Resources;
 
                 Logger.TraceInformation("[{0}]: Emitting assembly for {1}", GetType().Name, Name);
 
@@ -73,36 +71,30 @@ namespace Microsoft.Framework.Runtime.Roslyn
 
                 if (_supportsPdbGeneration.Value)
                 {
-                    emitResult = BeforeCompileContext.Compilation.Emit(assemblyStream, pdbStream: pdbStream, manifestResources: resources);
+                    emitResult = CompilationContext.Compilation.Emit(assemblyStream, pdbStream: pdbStream, manifestResources: resources);
                 }
                 else
                 {
                     Logger.TraceWarning("PDB generation is not supported on this platform");
-                    emitResult = BeforeCompileContext.Compilation.Emit(assemblyStream, manifestResources: resources);
+                    emitResult = CompilationContext.Compilation.Emit(assemblyStream, manifestResources: resources);
                 }
 
                 sw.Stop();
 
                 Logger.TraceInformation("[{0}]: Emitted {1} in {2}ms", GetType().Name, Name, sw.ElapsedMilliseconds);
 
-                var diagnostics = BeforeCompileContext.Diagnostics.Concat(
+                var diagnostics = CompilationContext.Diagnostics.Concat(
                     emitResult.Diagnostics);
 
-                var afterCompileContext = new AfterCompileContext()
+                var afterCompileContext = new AfterCompileContext(CompilationContext.ProjectContext,
+                                                                  CompilationContext.Compilation,
+                                                                  diagnostics)
                 {
-                    ProjectContext = BeforeCompileContext.ProjectContext,
-                    Compilation = BeforeCompileContext.Compilation,
                     AssemblyStream = assemblyStream,
-                    SymbolStream = pdbStream,
-                    Diagnostics = new List<Diagnostic>()
+                    SymbolStream = pdbStream
                 };
 
-                foreach (var diagnostic in diagnostics)
-                {
-                    afterCompileContext.Diagnostics.Add(diagnostic);
-                }
-
-                foreach (var m in BeforeCompileContext.Modules)
+                foreach (var m in CompilationContext.Modules)
                 {
                     m.AfterCompile(afterCompileContext);
                 }
@@ -141,12 +133,12 @@ namespace Microsoft.Framework.Runtime.Roslyn
         public void EmitReferenceAssembly(Stream stream)
         {
             var emitOptions = new EmitOptions(metadataOnly: true);
-            BeforeCompileContext.Compilation.Emit(stream, options: emitOptions);
+            CompilationContext.Compilation.Emit(stream, options: emitOptions);
         }
 
         public IDiagnosticResult EmitAssembly(string outputPath)
         {
-            IList<ResourceDescription> resources = BeforeCompileContext.Resources;
+            IList<ResourceDescription> resources = CompilationContext.Resources;
 
             var assemblyPath = Path.Combine(outputPath, Name + ".dll");
             var pdbPath = Path.Combine(outputPath, Name + ".pdb");
@@ -157,7 +149,7 @@ namespace Microsoft.Framework.Runtime.Roslyn
             using (var xmlDocStream = new MemoryStream())
             using (var pdbStream = new MemoryStream())
             using (var assemblyStream = new MemoryStream())
-            using (var win32resStream = BeforeCompileContext.Compilation.CreateDefaultWin32Resources(
+            using (var win32resStream = CompilationContext.Compilation.CreateDefaultWin32Resources(
                 versionResource: true,
                 noManifest: false,
                 manifestContents: null,
@@ -175,7 +167,7 @@ namespace Microsoft.Framework.Runtime.Roslyn
                 if (_supportsPdbGeneration.Value)
                 {
                     var options = new EmitOptions(pdbFilePath: pdbPath);
-                    emitResult = BeforeCompileContext.Compilation.Emit(
+                    emitResult = CompilationContext.Compilation.Emit(
                         assemblyStream,
                         pdbStream: pdbStream,
                         xmlDocumentationStream: xmlDocStream,
@@ -186,7 +178,7 @@ namespace Microsoft.Framework.Runtime.Roslyn
                 else
                 {
                     Logger.TraceWarning("PDB generation is not supported on this platform");
-                    emitResult = BeforeCompileContext.Compilation.Emit(
+                    emitResult = CompilationContext.Compilation.Emit(
                         assemblyStream,
                         xmlDocumentationStream: xmlDocStream,
                         manifestResources: resources,
@@ -197,22 +189,16 @@ namespace Microsoft.Framework.Runtime.Roslyn
 
                 Logger.TraceInformation("[{0}]: Emitted {1} in {2}ms", GetType().Name, Name, sw.ElapsedMilliseconds);
 
-                var afterCompileContext = new AfterCompileContext()
+                var afterCompileContext = new AfterCompileContext(CompilationContext.ProjectContext,
+                                                                  CompilationContext.Compilation,
+                                                                  emitResult.Diagnostics)
                 {
-                    ProjectContext = BeforeCompileContext.ProjectContext,
-                    Compilation = BeforeCompileContext.Compilation,
                     AssemblyStream = assemblyStream,
                     SymbolStream = pdbStream,
-                    XmlDocStream = xmlDocStream,
-                    Diagnostics = new List<Diagnostic>()
+                    XmlDocStream = xmlDocStream
                 };
 
-                foreach (var diagnostic in emitResult.Diagnostics)
-                {
-                    afterCompileContext.Diagnostics.Add(diagnostic);
-                }
-
-                foreach (var m in BeforeCompileContext.Modules)
+                foreach (var m in CompilationContext.Modules)
                 {
                     m.AfterCompile(afterCompileContext);
                 }

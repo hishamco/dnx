@@ -57,7 +57,7 @@ namespace Microsoft.Framework.Runtime.Roslyn
             }
 
             // Project reference
-            return new RoslynProjectReference(project, compliationContext);
+            return new RoslynProjectReference(compliationContext);
         }
     }
 }

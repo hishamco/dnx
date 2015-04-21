@@ -45,7 +45,7 @@ namespace Microsoft.Framework.Runtime.Roslyn
             _services = services;
         }
 
-        public BeforeCompileContext CompileProject(
+        public CompilationContext CompileProject(
             ICompilationProject project,
             ILibraryKey target,
             IEnumerable<IMetadataReference> incomingReferences,
@@ -124,31 +124,18 @@ namespace Microsoft.Framework.Runtime.Roslyn
 
             compilation = ApplyVersionInfo(compilation, project, parseOptions);
 
-            Func<IList<ResourceDescription>> resourceResolverWrapper = () =>
-            {
-                var resourceResolveSw = Stopwatch.StartNew();
-                Logger.TraceInformation("[{0}]: Generating resources for {1}", nameof(BeforeCompileContext), project);
-
-                var resources = resourcesResolver()
-                    .Select(res => new ResourceDescription(res.Name, res.StreamFactory, isPublic: true))
-                    .ToList();
-
-                resourceResolveSw.Stop();
-                Logger.TraceInformation("[{0}]: Generated resources for {1} in {2}ms", nameof(BeforeCompileContext),
-                                                                                       project.Name,
-                                                                                       sw.ElapsedMilliseconds);
-
-                return resources;
-            };
-
-            var compilationContext = new BeforeCompileContext(resourceResolverWrapper)
-            {
-                Compilation = compilation,
-                ProjectContext = new ProjectContext(project, target.TargetFramework, target.Configuration),
-                Diagnostics = new List<Diagnostic>(),
-                Modules = new List<ICompileModule>(),
-                MetadataReferences = new List<IMetadataReference>(incomingReferences)
-            };
+            var compilationContext = new CompilationContext(
+                compilation,
+                project,
+                target.TargetFramework,
+                target.Configuration,
+                incomingReferences,
+                () => resourcesResolver()
+                    .Select(res => new ResourceDescription(
+                        res.Name,
+                        res.StreamFactory,
+                        isPublic: true))
+                    .ToList());
 
             // Apply strong-name settings
             ApplyStrongNameSettings(compilationContext);
@@ -190,7 +177,7 @@ namespace Microsoft.Framework.Runtime.Roslyn
                 var precompSw = Stopwatch.StartNew();
                 foreach (var module in compilationContext.Modules)
                 {
-                    module.BeforeCompile(compilationContext);
+                    module.BeforeCompile(compilationContext.BeforeCompileContext);
                 }
 
                 precompSw.Stop();
@@ -203,7 +190,7 @@ namespace Microsoft.Framework.Runtime.Roslyn
             return compilationContext;
         }
 
-        private void ApplyStrongNameSettings(BeforeCompileContext beforeCompileContext)
+        private void ApplyStrongNameSettings(CompilationContext compilationContext)
         {
             // This is temporary, eventually we'll want a project.json feature for this
             var keyFile = Environment.GetEnvironmentVariable(EnvironmentNames.BuildKeyFile);
@@ -216,16 +203,16 @@ namespace Microsoft.Framework.Runtime.Roslyn
                     string.Equals(delaySignString, "1", StringComparison.OrdinalIgnoreCase));
 
                 var strongNameProvider = new DesktopStrongNameProvider();
-                var newOptions = beforeCompileContext.Compilation.Options
+                var newOptions = compilationContext.Compilation.Options
                     .WithStrongNameProvider(strongNameProvider)
                     .WithCryptoKeyFile(keyFile)
                     .WithDelaySign(delaySign);
-                beforeCompileContext.Compilation = beforeCompileContext.Compilation.WithOptions(newOptions);
+                compilationContext.Compilation = compilationContext.Compilation.WithOptions(newOptions);
 #else
                 var diag = Diagnostic.Create(
                     RoslynDiagnostics.StrongNamingNotSupported,
                     null);
-                beforeCompileContext.Diagnostics.Add(diag);
+                compilationContext.Diagnostics.Add(diag);
 #endif
             }
         }

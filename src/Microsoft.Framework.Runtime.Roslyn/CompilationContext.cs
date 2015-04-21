@@ -28,7 +28,7 @@ namespace Microsoft.Framework.Runtime.Roslyn
             var lazyResourceResolver = new Lazy<IList<ResourceDescription>>(() =>
             {
                 var sw = Stopwatch.StartNew();
-                Logger.TraceInformation("[{0}]: Generating resources for {1}", nameof(BeforeCompileContext), project);
+                Logger.TraceInformation("[{0}]: Generating resources for {1}", nameof(BeforeCompileContext), project.Name);
 
                 var resources = resourcesResolver();
 
